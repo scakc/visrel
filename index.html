@@ -1,0 +1,44 @@
+<!-- this page has a following information
+1. Timeline graph area: This area is used to show the timeline graphs. Where there can be multiple timeline graphs added.
+2. Timeline graph: A sequence of events can be pointed on 1 D line graph by using this graph. It supports adding events on the graph and also supports zooming in and out.
+3. Periodicity graph: This graph is used to show the periodicity of the events as a Gaussian distribution respective to a timeline graph. This may have overlapping periodicity graphs from respective timelines.
+4. Decay graph: This graph is used to show the pickup and decay of the execution pattern as a Gaussian distribution respective to a timeline graph. This may have overlapping decay graphs from respective timelines.
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gaussian Periodicity Model</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <!-- import d3.js, moment -->
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://momentjs.com/downloads/moment.js"></script>
+    <script src="main.js"></script>
+</head>
+<body>
+    <div id="header">
+        <h1>Gaussian Periodicity Model</h1>
+        <button class="opbutton" id="addbtn">Add Timeline</button>
+        <button class="opbutton" id="clearall">Clear All Data</button>
+        <!-- add a date picker -->
+        <input type="date" id="datePicker" name="datePicker">
+        <!-- add a radio input -->
+        <input type="radio" id="clicksvg1" name="clicksvg" value="1" checked>AddPoint
+        <input type="radio" id="clicksvg2" name="clicksvg" value="2">MovePredDate
+        <button class="opbutton" id="downloadLS">Download LocalStorage</button>
+        <button class="opbutton" id="uploadLS">Upload LocalStorage</button>
+    </div>
+    <div id="timelineGraphArea" class="timelineGraphArea">
+        <!-- <div id="timelineGraph1" class="timelineGraph"></div> -->
+    </div>
+    <div id="rightarea">
+        <div id="periodicityGraphArea" class="periodicityGraphArea">
+            <div id="periodicityGraph"></div>
+        </div>
+        <div id="decayGraphArea" class="decayGraphArea">
+            <div id="decayGraph"></div>
+        </div>
+    </div>
+</body>
+</html>
