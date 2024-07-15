@@ -40,6 +40,7 @@ class Timeline {
 }
 
 // Function definations
+/* Utility Functions */
 // function load session data
 function loadSessionData() {
     // load the session data
@@ -59,6 +60,7 @@ function loadSessionData() {
         }
 
         addPeriodGaussianPlot(timelines);
+        addTimeGaussianPlot(timelines);
     }
 }
 
@@ -130,6 +132,36 @@ function momentToDate(moment) {
     return moment.format("DD-MM-YYYY")
 }
 
+/* Button Functions */
+// function to download the local storage data
+function downloadLS() {
+    var data = JSON.stringify(session_data);
+    var blob = new Blob([data], {type: "text/plain"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "session_data.json";
+    a.click();
+}
+
+// function to upload the local storage data
+function uploadLS() {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.onchange = function() {
+        var file = input.files[0];
+        var reader = new FileReader();
+        reader.onload = function() {
+            var data = JSON.parse(reader.result);
+            session_data = data;
+            localStorage.setItem("session_data", JSON.stringify(session_data));
+            loadSessionData();
+        }
+        reader.readAsText(file);
+    }
+    input.click();
+}
+
 // function to clear all the timelines
 function clearAll() {
     // clear the session data
@@ -155,6 +187,26 @@ function addTimeline() {
     addTimelineWithInput(name, start_date, end_date);
 }
 
+// function to delete a timeline
+function deleteTimeline(timeline) {
+    // remove the timeline from the session data
+    delete session_data.timelines[timeline.name];
+    delete timelines[timeline.name];
+    delete timeline_colors[timeline.name];
+
+    // remove the timeline from the visualization
+    var div = document.getElementById(timeline.name);
+    div.parentNode.removeChild(div);
+
+    // save the session data
+    saveSessionData();
+    addPeriodGaussianPlot(timelines);
+    addTimeGaussianPlot(timelines);
+    console.log("deleted timeline", timeline.name);
+}
+
+/* Dynamic Processing Functions */
+/* Gaussian Periodicity Plot */
 // function to add a timeline with input
 function addTimelineWithInput(name, start_date, end_date) {
     // check if the input is valid
@@ -184,6 +236,7 @@ function addTimelineWithInput(name, start_date, end_date) {
     // save the session data
     saveSessionData();
     addPeriodGaussianPlot(timelines);
+    addTimeGaussianPlot(timelines);
 }
 
 // function to add a timeline plot
@@ -288,6 +341,7 @@ function addTimelinePlot(timeline) {
 
         // update the gaussian plot
         addPeriodGaussianPlot(timelines);
+        addTimeGaussianPlot(timelines);
     });
 
     // plot the datePicker on the timeline as a vertical line in format MM-DD-YYYY
@@ -352,23 +406,6 @@ function addTimelinePlot(timeline) {
     }
 
     document.getElementById(timeline.name).appendChild(deletebtn);
-}
-
-// function to delete a timeline
-function deleteTimeline(timeline) {
-    // remove the timeline from the session data
-    delete session_data.timelines[timeline.name];
-    delete timelines[timeline.name];
-    delete timeline_colors[timeline.name];
-
-    // remove the timeline from the visualization
-    var div = document.getElementById(timeline.name);
-    div.parentNode.removeChild(div);
-
-    // save the session data
-    saveSessionData();
-    addPeriodGaussianPlot(timelines);
-    console.log("deleted timeline", timeline.name);
 }
 
 // function to add a gaussian plot on mean and variance of the period per timeline
@@ -607,33 +644,138 @@ function updateMarkers() {
 
     // update the gaussian plot
     addPeriodGaussianPlot(timelines);
+    addTimeGaussianPlot(timelines);
 }
 
-// function to download the local storage data
-function downloadLS() {
-    var data = JSON.stringify(session_data);
-    var blob = new Blob([data], {type: "text/plain"});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "session_data.json";
-    a.click();
-}
-
-// function to upload the local storage data
-function uploadLS() {
-    var input = document.createElement("input");
-    input.type = "file";
-    input.onchange = function() {
-        var file = input.files[0];
-        var reader = new FileReader();
-        reader.onload = function() {
-            var data = JSON.parse(reader.result);
-            session_data = data;
-            localStorage.setItem("session_data", JSON.stringify(session_data));
-            loadSessionData();
-        }
-        reader.readAsText(file);
+/* Gaussian Direct TimeStamping Functions */
+// function to add gaussian plot for direct time stamping
+function addTimeGaussianPlot(timelines){
+    // check if the timelines is empty
+    if (Object.keys(timelines).length == 0) {
+        return;
     }
-    input.click();
+
+    // get the div for the timeline plot
+    var div = document.getElementById("decayGraphArea");
+
+    // empty the div
+    div.innerHTML = "";
+
+    var svg = d3.select("#decayGraphArea").append("svg")
+        .attr("width", 800)
+        .attr("height", 800);
+
+    // convert min and max date to date scale usable by d3
+    var min_time = min_date.toDate();
+    var max_time = max_date.toDate();
+
+    // create a new scale for the timeline using the min and max period
+    var x = d3.scaleTime()
+        .domain([min_time, max_time])
+        .range([0, 800]);
+    
+    var y = d3.scaleLinear()
+        .domain([0, 1])
+        .range([0, 100]);
+
+    // add the axis to the plot
+    var xAxis = d3.axisBottom(x);
+    var translateY = 400;
+    svg.append("g")
+        .attr("transform", "translate(50, " + translateY + ")")
+        .call(xAxis);
+    
+    // add the gaussian plot for the time stamps for each respective timeline
+    var counter = 0;
+    for (var key in timelines) {
+        var timeline = timelines[key];
+        
+        // compute mean and variance for the timeline mean (sum of all events divided by number of events)
+        var meanVarianceEvents = computeMeanVarianceEvents(timeline);
+        var mean = meanVarianceEvents[0];
+        var variance = meanVarianceEvents[1];
+        var events = meanVarianceEvents[2];
+
+        // add events as points on the x-axis
+        for (var i = 0; i < events.length; i++) {
+            var event = events[i];
+            svg.append("circle")
+                .attr("cx", x(event.date))
+                .attr("cy", translateY)
+                .attr("r", 5)
+                .attr("fill", timeline_colors[key]);
+        }
+
+        // add the gaussian plot for the mean and variance
+        var step = (max_time - min_time) / 200.0;
+        var gaussian = d3.range(min_time, max_time, step).map(function(d) {
+            return {x: d, y: gaussianDensity(d, mean, variance)};
+        });
+
+        var max_y = d3.max(gaussian, function(d) { return d.y; });
+        var multiplier = translateY / max_y;
+        console.log("max y", max_y, gaussian);
+
+        for (var i = 0; i < gaussian.length; i++) {
+            var point = gaussian[i];
+            svg.append("circle")
+                .attr("cx", x(point.x))
+                .attr("cy", (400 - 5*10e9*y(point.y)))
+                .attr("r", 2)
+                .attr("fill", timeline_colors[key]);
+        }
+
+        // scale the y-axis to the have max value as max of the gaussian
+        var yAxis = d3.axisLeft(y);
+        svg.append("g")
+            .attr("transform", "translate(50, 400)")
+            .call(yAxis);
+
+        // label the axis with axis names
+        svg.append("text")
+            .attr("x", 370)
+            .attr("y", 500)
+            .text("Time");
+
+        // add the date marker for the datePicker
+        var datePicker = document.getElementById("datePicker");
+        var date = moment(datePicker.value, "YYYY-MM-DD");
+
+        var coords = x(date.toDate());
+        svg.append("line")
+            .attr("x1", coords)
+            .attr("y1", 0)
+            .attr("x2", coords)
+            .attr("y2", 200)
+            .attr("transform", "translate(0, 200)")
+            .attr("stroke", "black")
+            .attr("stroke-width", 1);
+        
+        counter++;
+    }
+
+    // show the svg element on the page by adding it to the div
+    div.appendChild(svg.node());
+}
+
+// function to compute mean, variance with respect to events below the datePicker
+function computeMeanVarianceEvents(timeline) {
+    // get the date from the datePicker
+    var datePicker = document.getElementById("datePicker");
+    var date = moment(datePicker.value, "YYYY-MM-DD");
+
+    // get the events below the datePicker
+    var events = [];
+    for (var i = 0; i < timeline.events.length; i++) {
+        var event = timeline.events[i];
+        if (event.date < date) {
+            events.push(event.date);
+        }
+    }
+
+    // compute the mean and variance for the events
+    var mean = d3.mean(events);
+    var variance = d3.variance(events);
+
+    return [mean, variance, events];
 }
