@@ -24,6 +24,11 @@ window.onload = function() {
     // add event listener for downloadLS button and uploadLS button
     document.getElementById("downloadLS").addEventListener("click", downloadLS);
     document.getElementById("uploadLS").addEventListener("click", uploadLS);
+    // add change listener for radio buttons
+    var radios = document.getElementsByName("clicksvg");
+    for (var i = 0; i < radios.length; i++) {
+        radios[i].addEventListener("change", saveSessionData);
+    }
 }
 
 // Class definations
@@ -62,10 +67,33 @@ function loadSessionData() {
         addPeriodGaussianPlot(timelines);
         addTimeGaussianPlot(timelines);
     }
+
+    // load the radio buttons for clicksvg from session data
+    if (session_data.clicksvg != null) {
+        var radios = document.getElementsByName("clicksvg");
+        for (var i = 0; i < radios.length; i++) {
+            if (radios[i].value == session_data.clicksvg) {
+                radios[i].checked = true;
+                break;
+            }
+        }
+    }
 }
 
 // function to save session data
 function saveSessionData() {
+
+    // save the radio buttons for clicksvg to session data
+    var radios = document.getElementsByName("clicksvg");
+    for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+            session_data.clicksvg = radios[i].value;
+            break;
+        }
+    }
+
+    // console.log("saving session data", session_data);
+
     // save the session data
     localStorage.setItem("session_data", JSON.stringify(session_data));
 }
@@ -426,6 +454,8 @@ function addPeriodGaussianPlot(timelines) {
     var max_period = 0;
     var timeline_periods = {};
     var deltaLEs = {};
+    var multiplier = 10e24;
+    var translateY = 400;
     // for loop over all the timelines to get period range 
     for (var key in timelines) {
         var timeline = timelines[key];
@@ -443,6 +473,11 @@ function addPeriodGaussianPlot(timelines) {
         if (max > max_period) {
             max_period = max;
         }
+
+        // get the multiplier for the mean
+        var mean_temp = d3.mean(periods);
+        var variance_temp = d3.variance(periods);
+        multiplier = Math.min(4 / gaussianDensity(mean_temp, mean_temp, variance_temp), multiplier);
     }
 
     min_period = min_period - 500;
@@ -466,7 +501,6 @@ function addPeriodGaussianPlot(timelines) {
 
     // add the axis to the plot
     var xAxis = d3.axisBottom(x);
-    var translateY = 400;
     svg.append("g")
         .attr("transform", "translate(50, " + translateY + ")")
         .call(xAxis);
@@ -494,15 +528,14 @@ function addPeriodGaussianPlot(timelines) {
             return {x: d, y: gaussianDensity(d, mean, variance)};
         });
 
-        var max_y = d3.max(gaussian, function(d) { return d.y; });
-        var multiplier = translateY / max_y;
+        console.log("multiplier period", multiplier)
         // console.log("max y", max_y, gaussian);
 
         for (var i = 0; i < gaussian.length; i++) {
             var point = gaussian[i];
             svg.append("circle")
                 .attr("cx", x(point.x))
-                .attr("cy", (400 - 1000*y(point.y)))
+                .attr("cy", (400 - y(multiplier*point.y)))
                 .attr("r", 2)
                 .attr("fill", colormaps[counter % colormaps.length]);
         }
@@ -535,12 +568,14 @@ function addPeriodGaussianPlot(timelines) {
 
             // in the gaussian map add a black circle where this vertical line cuts and mark the value
             var yval = gaussianDensity(deltaLE, mean, variance);
-            var ycoords = 400 - 1000*y(yval);
+            var ycoords = 400 - multiplier*y(yval);
             svg.append("circle")
                 .attr("cx", coords)
                 .attr("cy", ycoords)
                 .attr("r", 5)
-                .attr("fill", "black");
+                .attr("fill", timeline_colors[key])
+                .attr("stroke", "black")
+                .attr("stroke-width", 2);
 
             // add a text to show the gaussian score, also translate the label to top
             svg.append("text")
@@ -645,6 +680,7 @@ function updateMarkers() {
     // update the gaussian plot
     addPeriodGaussianPlot(timelines);
     addTimeGaussianPlot(timelines);
+    saveSessionData();
 }
 
 /* Gaussian Direct TimeStamping Functions */
@@ -685,6 +721,20 @@ function addTimeGaussianPlot(timelines){
         .attr("transform", "translate(50, " + translateY + ")")
         .call(xAxis);
     
+    // computing multiplier
+    var multiplier = 10e24;
+    for (var key in timelines) {
+        var meanVarianceEvents = computeMeanVarianceEvents(timelines[key]);
+        var mean = meanVarianceEvents[0];
+        var variance = meanVarianceEvents[1];
+        var events = meanVarianceEvents[2];
+
+        var max_y_gaussian = gaussianDensity(mean, mean, variance);
+        var multiplier = Math.min(4 / max_y_gaussian, multiplier);
+    }
+
+    console.log("multiplier time", multiplier);
+
     // add the gaussian plot for the time stamps for each respective timeline
     var counter = 0;
     for (var key in timelines) {
@@ -700,7 +750,7 @@ function addTimeGaussianPlot(timelines){
         for (var i = 0; i < events.length; i++) {
             var event = events[i];
             svg.append("circle")
-                .attr("cx", x(event.date))
+                .attr("cx", x(event))
                 .attr("cy", translateY)
                 .attr("r", 5)
                 .attr("fill", timeline_colors[key]);
@@ -712,15 +762,14 @@ function addTimeGaussianPlot(timelines){
             return {x: d, y: gaussianDensity(d, mean, variance)};
         });
 
-        var max_y = d3.max(gaussian, function(d) { return d.y; });
-        var multiplier = translateY / max_y;
-        console.log("max y", max_y, gaussian);
+        // console.log("multiplier", multiplier)
+        // console.log("max y", max_y, gaussian);
 
         for (var i = 0; i < gaussian.length; i++) {
             var point = gaussian[i];
             svg.append("circle")
                 .attr("cx", x(point.x))
-                .attr("cy", (400 - 5*10e9*y(point.y)))
+                .attr("cy", (400 - multiplier*y(point.y)))
                 .attr("r", 2)
                 .attr("fill", timeline_colors[key]);
         }
@@ -751,6 +800,25 @@ function addTimeGaussianPlot(timelines){
             .attr("stroke", "black")
             .attr("stroke-width", 1);
         
+        // add a legend for the timeline and cross the gaussian with a black circle
+        var yval = gaussianDensity(date.toDate(), mean, variance);
+        var ycoords = 400 - multiplier*y(yval);
+        svg.append("circle")
+            .attr("cx", coords)
+            .attr("cy", ycoords)
+            .attr("r", 5)
+            .attr("fill", timeline_colors[key])
+            .attr("stroke", "black")
+            .attr("stroke-width", 2);
+
+        // add a text to show the gaussian score, also translate the label to top
+        svg.append("text")
+            .attr("x", 600)
+            .attr("y", 20 + counter*20)
+            .text((yval*multiplier).toFixed(2))
+            // add color
+            .attr("fill", timeline_colors[key]);
+
         counter++;
     }
 
