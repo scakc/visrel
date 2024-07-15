@@ -559,7 +559,7 @@ function addPeriodGaussianPlot(timelines) {
             var coords = x(deltaLE);
             svg.append("line")
                 .attr("x1", coords)
-                .attr("y1", 200)
+                .attr("y1", 100)
                 .attr("x2", coords)
                 .attr("y2", 450)
                 .attr("stroke", timeline_colors[key])
@@ -578,10 +578,22 @@ function addPeriodGaussianPlot(timelines) {
                 .attr("stroke-width", 2);
 
             // add a text to show the gaussian score, also translate the label to top
+            svg.append("circle")
+                .attr("cx", 580)
+                .attr("cy", 95 + counter*20)
+                .attr("r", 5)
+                .attr("stroke", "black")
+                .attr("stroke-width", 2)
+                .text((yval*10000).toFixed(2))
+                // add color
+                .attr("fill", timeline_colors[key]);
+
             svg.append("text")
-                .attr("x", coords + 5)
-                .attr("y", ycoords - 20)
-                .text((yval*10000).toFixed(2));
+                .attr("x", 600)
+                .attr("y", 100 + counter*20)
+                .text((yval*10000).toFixed(2))
+                // add color
+                .attr("fill", timeline_colors[key]);
         }
     
         counter++;
@@ -812,6 +824,15 @@ function addTimeGaussianPlot(timelines){
             .attr("stroke-width", 2);
 
         // add a text to show the gaussian score, also translate the label to top
+        svg.append("circle")
+            .attr("cx", 580)
+            .attr("cy", 15 + counter*20)
+            .attr("r", 5)
+            .attr("stroke", "black")
+            .attr("stroke-width", 2)
+            .text((yval*10000).toFixed(2))
+            // add color
+            .attr("fill", timeline_colors[key]);
         svg.append("text")
             .attr("x", 600)
             .attr("y", 20 + counter*20)
